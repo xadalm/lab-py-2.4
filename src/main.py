@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import tempfile
@@ -8,9 +9,11 @@ from src.task_receiver import TaskReceiver
 from src.sources.api_stub_source import ApiStubTaskSource
 from src.sources.file_source import FileTaskSource
 from src.sources.generator_source import GeneratedTaskSource
+from src.executor import AsyncExecutor
+from src.handlers.print_handler import PrintHandler
 
 
-def main() -> None:
+async def _async_main() -> None:
     log_path = Path(__file__).resolve().parent.parent / "shell.log"
     setup_logging(log_path)
     logger = logging.getLogger(__name__)
@@ -43,12 +46,13 @@ def main() -> None:
         tasks = receiver.collect_tasks()
         logger.info("Собрано задач: %s", len(tasks))
 
-        for task in tasks:
-            print(
-                f"[{task.id}] priority={task.priority.value}; "
-                f"status={task.status.value}; text={task.description}"
-            )
-            logger.info("Выведена задача id=%s", task.id)
+        async with AsyncExecutor(handlers=[PrintHandler()], concurrency=3) as executor:
+            await executor.run(tasks)
+
+
+def main() -> None:
+    asyncio.run(_async_main())
+
 
 if __name__ == "__main__":
     main()
